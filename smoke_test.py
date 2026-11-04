@@ -93,6 +93,19 @@ def main() -> int:
         for s in json.loads(samples_path.read_text(encoding="utf-8")):
             data = {f["name"]: f["value"] for f in s.get("form_fields", [])}
             check(s["method"].upper(), s["path"], data, strict=True)
+            # Satır sonları: Windows (\r\n) ve eski Mac (\r) dosyaları da aynı sonucu vermeli. CSV'yi
+            # csv.reader(io.StringIO(text)) ile okumadan önce text.replace("\r\n", "\n").replace("\r", "\n") yap.
+            if any("\n" in str(v) for v in data.values()):
+                for eol, label in (("\r\n", "\\r\\n"), ("\r", "\\r")):
+                    before_fail = failures
+                    check(s["method"].upper(), s["path"],
+                          {k: str(v).replace("\n", eol) if "\n" in str(v) else v for k, v in data.items()}, strict=True)
+                    if failures > before_fail:
+                        print(f"FAIL satır sonu {label}: aynı örnek veri {label} satır sonlarıyla gelince çalışmıyor. "
+                              "CSV'yi okumadan önce text = text.replace('\\r\\n', '\\n').replace('\\r', '\\n') yap.",
+                              file=sys.stderr)
+                    else:
+                        print(f"ok   satır sonu {label} -> {s['path']}")
 
     # Büyük girdi: gerçek kullanıcılar binlerce satır yapıştırır. En uzun metin alanını ~1,5 MB'a büyüt;
     # uygulama kendi sınırı için uyarı gösterebilir ama 413/5xx ya da genel "analiz edilemedi" hatası vermemeli.

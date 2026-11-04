@@ -82,6 +82,7 @@ def _norm(name):
 
 def parse_rows(text, kind, label, assumptions):
     """Parse one CSV text. Returns (rows, notes dict)."""
+    text = text.replace("\r\n", "\n").replace("\r", "\n")  # old-Mac / mixed line endings
     first_line = text.lstrip().split("\n", 1)[0]
     delim = ";" if first_line.count(";") > first_line.count(",") else ","
     reader = csv.DictReader(io.StringIO(text), delimiter=delim)
