@@ -1,0 +1,5 @@
+{
+  "app_title": "Refund & Dispute Loss Calculator",
+  "tagline": "Upload Stripe refunds and disputes CSV exports to see total loss, fee leakage and repeat customers.",
+  "lang": "en"
+}

@@ -1,0 +1,31 @@
+[
+  {
+    "method": "GET",
+    "path": "/",
+    "form_fields": []
+  },
+  {
+    "method": "POST",
+    "path": "/analyze",
+    "form_fields": [
+      {
+        "name": "demo",
+        "value": "1"
+      }
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/analyze",
+    "form_fields": [
+      {
+        "name": "refunds_text",
+        "value": "id,Created (UTC),Amount Refunded,Currency,Customer Email,Status,Fee\nre_1,2026-10-01 10:00,49.00,usd,a@example.com,succeeded,1.72\nre_2,2026-10-05 10:00,49.00,usd,a@example.com,succeeded,1.72\nre_3,2026-10-07 10:00,99.00,usd,b@example.com,succeeded,3.17"
+      },
+      {
+        "name": "disputes_text",
+        "value": "id,Created (UTC),Amount,Currency,Customer Email,Status,Fee\ndp_1,2026-10-03 10:00,99.00,usd,b@example.com,lost,15.00"
+      }
+    ]
+  }
+]

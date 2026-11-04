@@ -1,0 +1,111 @@
+{% extends "base.html" %}
+{% block title %}{{ app_title }}{% endblock %}
+{% block head %}<link rel="stylesheet" href="{{ url_for('static', filename='feature.css') }}">{% endblock %}
+{% block content %}
+<div class="container">
+  <div class="card">
+    <h2>Analyze your Stripe exports</h2>
+    <p class="muted">Upload or paste a Stripe refunds CSV, a disputes CSV, or both. Your data is processed in memory for this request only and is not stored.</p>
+    <form method="post" action="{{ url_for('feature.analyze') }}" enctype="multipart/form-data">
+      <div class="grid">
+        <div>
+          <h3>Refunds</h3>
+          <label for="refunds_file">CSV file</label>
+          <input type="file" id="refunds_file" name="refunds_file" accept=".csv,text/csv,text/plain">
+          <label for="refunds_text">…or paste CSV</label>
+          <textarea id="refunds_text" name="refunds_text" rows="5" placeholder="id,Created (UTC),Amount Refunded,Currency,Customer Email,...">{{ form.refunds_text }}</textarea>
+        </div>
+        <div>
+          <h3>Disputes</h3>
+          <label for="disputes_file">CSV file</label>
+          <input type="file" id="disputes_file" name="disputes_file" accept=".csv,text/csv,text/plain">
+          <label for="disputes_text">…or paste CSV</label>
+          <textarea id="disputes_text" name="disputes_text" rows="5" placeholder="id,Created (UTC),Amount,Currency,Customer Email,Status,...">{{ form.disputes_text }}</textarea>
+        </div>
+      </div>
+      <details class="assump">
+        <summary>Fee assumptions (used only when the CSV has no fee column)</summary>
+        <p class="muted">Processing fees are usually not returned on refunds. Check your own Stripe pricing and adjust these values.</p>
+        <div class="grid">
+          <div><label for="fee_pct">Processing fee (%)</label><input type="text" inputmode="decimal" id="fee_pct" name="fee_pct" value="{{ form.fee_pct }}"></div>
+          <div><label for="fee_fixed">Fixed fee per refunded payment</label><input type="text" inputmode="decimal" id="fee_fixed" name="fee_fixed" value="{{ form.fee_fixed }}"></div>
+          <div><label for="dispute_fee">Fee per dispute</label><input type="text" inputmode="decimal" id="dispute_fee" name="dispute_fee" value="{{ form.dispute_fee }}"></div>
+        </div>
+      </details>
+      <div class="actions">
+        <button type="submit" class="btn">Calculate loss</button>
+        <button type="submit" name="demo" value="1" class="btn btn-secondary" formnovalidate>Try with sample data</button>
+      </div>
+    </form>
+  </div>
+
+  {% if result %}
+  {% set cur = result.currency %}
+  {% if demo %}<div class="alert alert-success">You are viewing built-in sample data, not your own exports.</div>{% endif %}
+  {% for w in result.warnings %}<div class="alert alert-warning">{{ w }}</div>{% endfor %}
+
+  <div class="card">
+    <h2>Summary <span class="badge">{{ cur }}</span></h2>
+    {% if result.period %}<p class="muted">Records dated {{ result.period[0] }} to {{ result.period[1] }}.</p>{% endif %}
+    <div class="grid">
+      <div class="stat"><div class="muted">Total estimated loss</div><strong>{{ '{:,.2f}'.format(result.total_loss) }}</strong></div>
+      <div class="stat"><div class="muted">Fee leakage</div><strong>{{ '{:,.2f}'.format(result.fees_total) }}</strong></div>
+      <div class="stat"><div class="muted">Refunded revenue</div><strong>{{ '{:,.2f}'.format(result.refund_amount) }}</strong><div class="muted">{{ result.refund_count }} refund{{ '' if result.refund_count == 1 else 's' }}</div></div>
+      <div class="stat"><div class="muted">Lost disputes</div><strong>{{ '{:,.2f}'.format(result.dispute_lost) }}</strong><div class="muted">{{ result.dispute_lost_count }} lost of {{ result.dispute_count }} dispute{{ '' if result.dispute_count == 1 else 's' }}</div></div>
+    </div>
+    <p class="muted">Total loss = refunded amounts + lost dispute amounts + all fees ({{ '{:,.2f}'.format(result.refund_fees) }} on refunds, {{ '{:,.2f}'.format(result.dispute_fees) }} on disputes).
+    {% if result.dispute_open_count %}Not included: {{ '{:,.2f}'.format(result.dispute_open) }} still at risk in {{ result.dispute_open_count }} open dispute{{ '' if result.dispute_open_count == 1 else 's' }}.{% endif %}</p>
+  </div>
+
+  <div class="card">
+    <h2>Repeat customers</h2>
+    {% if result.repeat %}
+    <p class="muted">{{ result.repeat|length }} customer{{ '' if result.repeat|length == 1 else 's' }} with two or more refunds or disputes.</p>
+    <table class="stack">
+      <thead><tr><th>Email</th><th>Refunds</th><th>Disputes</th><th>Total loss</th><th>Flags</th></tr></thead>
+      <tbody>
+      {% for c in result.repeat %}
+      <tr><td data-label="Email">{{ c.email }}</td><td data-label="Refunds">{{ c.refunds }}</td><td data-label="Disputes">{{ c.disputes }}</td><td data-label="Total loss">{{ '{:,.2f}'.format(c.total) }}</td><td data-label="Flags">{% for f in c.flags %}<span class="badge">{{ f }}</span> {% endfor %}</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <p class="muted">No customer email appears in more than one refund or dispute in this data.</p>
+    {% endif %}
+  </div>
+
+  <div class="card">
+    <h2>All customers by loss</h2>
+    {% if result.customers %}
+    <div class="actions"><a class="btn" download="customer-loss-report.csv" href="{{ export_uri }}">Download CSV</a></div>
+    <table class="stack">
+      <thead><tr><th>Email</th><th>Refunds</th><th>Disputes</th><th>Refunded</th><th>Lost disputes</th><th>Fees</th><th>Total loss</th></tr></thead>
+      <tbody>
+      {% for c in result.customers[:200] %}
+      <tr><td data-label="Email">{{ c.email }}</td><td data-label="Refunds">{{ c.refunds }}</td><td data-label="Disputes">{{ c.disputes }}</td><td data-label="Refunded">{{ '{:,.2f}'.format(c.refunded) }}</td><td data-label="Lost disputes">{{ '{:,.2f}'.format(c.lost) }}</td><td data-label="Fees">{{ '{:,.2f}'.format(c.fees) }}</td><td data-label="Total loss">{{ '{:,.2f}'.format(c.total) }}</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    {% if result.customers|length > 200 %}<p class="muted">Showing the top 200 of {{ result.customers|length }} customers. The CSV download contains all of them.</p>{% endif %}
+    {% else %}
+    <p class="alert alert-warning">No rows had a valid customer email, so a per-customer breakdown isn't available. Totals above are still valid.</p>
+    {% endif %}
+  </div>
+
+  {% if result.countries %}
+  <div class="card">
+    <h2>Loss by country</h2>
+    <table class="stack">
+      <thead><tr><th>Country</th><th>Records</th><th>Loss</th></tr></thead>
+      <tbody>
+      {% for c in result.countries %}
+      <tr><td data-label="Country">{{ c.country }}</td><td data-label="Records">{{ c.events }}</td><td data-label="Loss">{{ '{:,.2f}'.format(c.loss) }}</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    <p class="muted">Country loss counts refunds and lost disputes plus fees, and fees only for won or open disputes.</p>
+  </div>
+  {% endif %}
+  {% endif %}
+</div>
+{% endblock %}
